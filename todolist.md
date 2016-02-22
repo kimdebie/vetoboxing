@@ -22,18 +22,18 @@ Output per treatment (1000 iterations):
 Play 27 games in total: 
 
 Variation in status quo: 
-1. mobile status quo: random draws
-2. mobile status quo: with history
-3. mobile status quo: with history plus random draws
+1.	mobile status quo: random draws
+2.	mobile status quo: with history
+3.	mobile status quo: with history plus random draws
 
 Variation in the number of veto players:
-1. 0 veto players
-2. 1 veto players
-3. 2 veto players
+1.	0 veto players
+2. 	1 veto players
+3. 	2 veto players
 
 Variation in the input distributions:
-1. Normal distribution
-2. Uniform distribution
-3. Exponential distribution
+1. 	Normal distribution
+2. 	Uniform distribution
+3. 	Exponential distribution
 
 For each of the 27 games (3x3x3), save the 5 variables above.
