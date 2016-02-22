@@ -6,48 +6,77 @@
 ''
 '' by: Kim de Bie
 '' created: 2 February 2016
-'' last updated: 19 February 2016
+'' last updated: 22 February 2016
 '' 
 '''''''''
 
 import numpy as np
 import math
 
+#----------------------------------------------------------------------------------------------------#
+'''
+Setting global variables as input for the simulation
+'''
+# number of runs of the simulation
+# input: any integer >0
+runs 				= 10
+
+# the method used to calculate distance between to points
+# input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
+distance_type 		= 'city-block'
+
+# the number of dimensions that the game uses
+# input: an integer
+number_dimensions 	= 2
+
+# the preferences of the voters
+# input: two-dimensional point with floats. List may be extended with more voters
+voter_A 			= (1.0,1.0)
+voter_B				= (8.0,4.0)
+voter_C 			= (3.0,8.0)
+
+# vector with the voters
+# input: the names of all voters
+voters 				= [voter_A, voter_B, voter_C]
+
+# determine the status quo
+# input: two-dimensional point with floats
+status_quo 			= (5.0,5.0) 
+
+# the agenda setter
+# input: one of the voters
+agenda_setter 		= voter_B
+
+# determine who the veto players are
+# input: any, or none, of the voters
+veto_players 		= [voter_A]
+
+#----------------------------------------------------------------------------------------------------#
+
 def simulation():
 
 	'''
-	Function to set inputs and run the simulation.
-	TODO: Everything is currently hardcoded, must be made much more flexible.
-	Current setup is easier for testing though
+	Function to run the simulation.
 	'''
 
-	# ask user for input as points
-	voter_A = (1.0,1.0) #input("Please enter the value for voter A: ")
-	voter_B = (8.0,4.0) #input("Please enter the value for voter B: ")
-	voter_C = (3.0,8.0) #input("Please enter the value for voter C: ")
+	for run in range(runs):
 
-	voters = [voter_A, voter_B, voter_C]
+		#add random points on a grid
+		random_points = addRandomPoints(10, 10, 0.1)
 
-	# determine the status quo
-	status_quo = (5.0,5.0) #input("Please enter the value for the status quo: ")
+		# which points are candidates? 
+		# should be in preference circles of both agenda setter and veto players
+		points_in_circle = pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo)
 
-	#determine who the veto players are
-	veto_players = [voter_A]
+		# select the preferred point
+		preferred_point = closestToAgendaSetter(points_in_circle, status_quo, agenda_setter) 
 
-	#determine the agenda setter
-	agenda_setter = voter_B
+		print 'The outcome of this veto-player game is', preferred_point
+		
+		# determine the distance that was travelled in this run of the veto-player game
+		distance_travelled = determineDistance(preferred_point, status_quo)
 
-	#add random points on a grid
-	random_points = addRandomPoints(10, 10, 0.1)
-
-	# which points are candidates? 
-	# should be in preference circles of both agenda setter and veto players
-	points_in_circle = pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo)
-
-	# select the preferred point
-	preferred_point = closestToAgendaSetter(points_in_circle, status_quo, agenda_setter) 
-
-	print 'The outcome of this veto-player game is', preferred_point
+		print 'The distance that was travelled is', distance_travelled
 
 
 def addRandomPoints(height, width, breaks):
@@ -69,7 +98,6 @@ def addRandomPoints(height, width, breaks):
 	return points
 
 
-
 def pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo):
 
 	'''
@@ -83,9 +111,14 @@ def pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo):
 	# points will be stored in this array
 	selected_points = []
 
-	# determining the radius of veto player and agenda setter: how far away can points be?
-	veto_radius = determineDistance(veto_players[0], status_quo)
+	# determining the radius of agenda setter: how far away can points be to still be inside circle?
 	as_radius = determineDistance(agenda_setter, status_quo)
+
+	# determining the radius for all veto players
+	veto_radius = []
+	for veto in veto_players:
+		radius = determineDistance(veto, status_quo)
+		veto_radius.append(radius)
 
 	# to determine if points are inside a circle:
 	# https://stackoverflow.com/questions/481144/equation-for-testing-if-a-point-is-inside-a-circle
@@ -95,8 +128,9 @@ def pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo):
 		# check if point is inside preference circle of agenda setter
 		if ((agenda_setter[0] - point[0])**2 + (agenda_setter[1] - point[1])**2) < as_radius**2:
 
-			#if so, check if point is insider preference circle of veto player
-			if ((veto_players[0][0] - point[0])**2 + (veto_players[0][1] - point[1])**2) < veto_radius**2:
+			# if so, check if point is insider preference circle of veto player
+			# TODO: this should be adapted so that all veto players are checked (currently only fit for 1 VP)
+			if ((veto_players[0][0] - point[0])**2 + (veto_players[0][1] - point[1])**2) < veto_radius[0]**2:
 
 				#if both are the case, the point is a candidate for the outcome
 				selected_points.append(point)		
@@ -145,11 +179,18 @@ def determineDistance(point1, point2):
 	As such, it can also be used to determine the radius of a preference circle (by inputting 
 	a point	and the status quo).
 	'''
+	if distance_type == 'pyth':
+		# 'hypot' uses the pythagorean theorem to determine distance between two points
+		distance = math.hypot(point2[0] - point1[0], point2[1] - point1[1])
 
-	# 'hypot' uses the pythagorean theorem to determine distance between two points
-	distance = math.hypot(point2[0] - point1[0], point2[1] - point1[1])
+	elif distance_type == 'city-block':
+		# determines the city-block distance
+		distance = (point2[0] - point1[0]) + (point2[1] - point1[1])
+
 	return distance
 
+
+#----------------------------------------------------------------------------------------------------#
 
 # running the simulation
 simulation()
