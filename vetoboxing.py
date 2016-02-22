@@ -12,21 +12,27 @@
 
 import numpy as np
 import math
+from scipy.spatial import distance as dist
+import csv
+
 
 #----------------------------------------------------------------------------------------------------#
+
 '''
-Setting global variables as input for the simulation
+Setting global variables as input for the simulation.
+For each variable, a value should be entered as per the input specifications.
 '''
+
 # number of runs of the simulation
 # input: any integer >0
-runs 				= 10
+runs 				= 2
 
 # the method used to calculate distance between to points
 # input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
 distance_type 		= 'city-block'
 
 # the number of dimensions that the game uses
-# input: an integer
+# input: an integer > 1
 number_dimensions 	= 2
 
 # the preferences of the voters
@@ -51,6 +57,14 @@ agenda_setter 		= voter_B
 # input: any, or none, of the voters
 veto_players 		= [voter_A]
 
+# boolean that determines if results are saved in csv
+# input: True or False
+save_results 		= True
+
+# filename for saving results
+# input: 'FILENAME.csv' (only mandatory when save_results is True)
+filename 			= 'results.csv'
+
 #----------------------------------------------------------------------------------------------------#
 
 def simulation():
@@ -59,24 +73,48 @@ def simulation():
 	Function to run the simulation.
 	'''
 
+	# results will be stored in an array
+	final_results = []
+
 	for run in range(runs):
 
-		#add random points on a grid
+		print 'Simulation number', run+1, 'running...'
+
+		# array to store results of current iteration
+		current_results = []
+
+		# add random points on a grid
 		random_points = addRandomPoints(10, 10, 0.1)
 
 		# which points are candidates? 
 		# should be in preference circles of both agenda setter and veto players
-		points_in_circle = pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo)
+		points_in_circle = pointsInWinset(random_points)
 
-		# select the preferred point
-		preferred_point = closestToAgendaSetter(points_in_circle, status_quo, agenda_setter) 
-
-		print 'The outcome of this veto-player game is', preferred_point
+		# select the preferred point and append it to results
+		outcome = closestToAgendaSetter(points_in_circle)
+		current_results.append(outcome)
 		
-		# determine the distance that was travelled in this run of the veto-player game
-		distance_travelled = determineDistance(preferred_point, status_quo)
+		# determine the euclidian distance that was travelled in this run and append to results
+		total_pyth_dist = determineDistance(outcome, status_quo, 'pyth')
+		current_results.append(total_pyth_dist)
 
-		print 'The distance that was travelled is', distance_travelled
+		# determine the manhattan distance that was travelled in this run and append to results
+		total_eucl_dist = determineDistance(outcome, status_quo, 'city-block')
+		current_results.append(total_eucl_dist)
+
+		# determine the distance travelled in each dimension
+		for i in range(number_dimensions):
+			distance = determineDistance(outcome[i], status_quo[i])
+			current_results.append(distance)
+
+		# results added to overall results
+		final_results.append(current_results)
+
+	if save_results == True:
+		with open(filename, 'wb') as output_file:
+			saveResults(output_file, final_results)
+
+	return final_results
 
 
 def addRandomPoints(height, width, breaks):
@@ -98,14 +136,14 @@ def addRandomPoints(height, width, breaks):
 	return points
 
 
-def pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo):
+def pointsInWinset(random_points):
 
 	'''
 	Function to determine which points fall inside the preference circles of both the agenda 
 	setter and all veto players. Thus, a first selection of elegible points is made: the 'winner'
 	must be in this set; otherwise it is the status quo.
 	TODO: currently, this function only works when there is only one veto player. Must be upgraded
-	to work for multiple veto players.
+	to work for multiple (or no) veto players.
 	'''
 
 	# points will be stored in this array
@@ -138,7 +176,7 @@ def pointsInVetoCircles(random_points, veto_players, agenda_setter, status_quo):
 	return selected_points
 
 
-def closestToAgendaSetter(points_in_circle, status_quo, agenda_setter):
+def closestToAgendaSetter(points_in_circle):
 
 	'''
 	This function determines which point from a given array is closest to the agenda setter. This
@@ -151,7 +189,6 @@ def closestToAgendaSetter(points_in_circle, status_quo, agenda_setter):
 
 	# if there are no points inside all preference circles, the outcome will be the status quo
 	if len(points_in_circle) == 0:
-		print 'The outcome of this game is the status quo: ', status_quo
 		preferred_point = status_quo
 
 	else: 
@@ -173,24 +210,47 @@ def closestToAgendaSetter(points_in_circle, status_quo, agenda_setter):
 	return preferred_point
 
 
-def determineDistance(point1, point2):
+def determineDistance(point1, point2, set_type=distance_type):
 
-	''' This function determines the distance between two points on a two-dimensional space.
+	''' 
+	This function determines the distance between two points in any number of dimensions.
 	As such, it can also be used to determine the radius of a preference circle (by inputting 
 	a point	and the status quo).
 	'''
-	if distance_type == 'pyth':
-		# 'hypot' uses the pythagorean theorem to determine distance between two points
-		distance = math.hypot(point2[0] - point1[0], point2[1] - point1[1])
 
-	elif distance_type == 'city-block':
-		# determines the city-block distance
-		distance = (point2[0] - point1[0]) + (point2[1] - point1[1])
+	if set_type == 'pyth':
+		# determines distance between two points using Pythagorean theorem
+		distance = dist.euclidean(point1, point2)
+
+	elif set_type == 'city-block':
+		# determines the city-block or Manhattan distance between two points
+		distance = dist.cityblock(point1, point2)
 
 	return distance
+
+
+def saveResults(file, results):
+
+	'''
+	Function to save results to a csv file. 
+	'''
+
+	writer = csv.writer(file)
+
+	print 'Saving results to csv...'
+
+	# first row contains variable names
+	writer.writerow(['Outcome', 'Euclidean distance', 'Manhattan Distance', 'First dimension', 'Second dimension', 'Third dimension'])
+
+	# write all result-rows to csv
+	for result in results:
+		writer.writerow(result)
+
+	print 'Done! Find your results in', filename
+
 
 
 #----------------------------------------------------------------------------------------------------#
 
 # running the simulation
-simulation()
+results = simulation()
