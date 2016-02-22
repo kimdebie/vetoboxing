@@ -18,6 +18,7 @@ def simulation():
 	'''
 	Function to set inputs and run the simulation.
 	TODO: Everything is currently hardcoded, must be made much more flexible.
+	Current setup is easier for testing though
 	'''
 
 	# ask user for input as points
