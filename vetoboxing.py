@@ -110,6 +110,7 @@ def simulation():
 		# results added to overall results
 		final_results.append(current_results)
 
+	# save results to a csv file
 	if save_results == True:
 		with open(filename, 'wb') as output_file:
 			saveResults(output_file, final_results)
