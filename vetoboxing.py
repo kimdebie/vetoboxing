@@ -24,7 +24,7 @@ For each variable, a value should be entered as per the input specifications.
 '''
 
 # number of runs of the simulation
-# input: any integer >0
+# input: any integer > 0
 runs 				= 2
 
 # the method used to calculate distance between to points
