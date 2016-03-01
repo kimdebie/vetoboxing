@@ -1,14 +1,17 @@
 # TO DO LIST
 #### As discussed on 22/02
-* add more veto players, and allow for game with 0 veto players
-* add iterations
+* DONE add more veto players, and allow for game with 0 veto players
+* DONE add iterations
 * let the status quo change for each iteration:
-	* with history: the new status quo is the outcome
-	* with random draws from various distributions: normal, uniform, exponential, paretian (mean of 0)
+	* DONE with history: the new status quo is the outcome
+	* DONE with random draws from various distributions: normal, uniform, exponential, paretian (mean of 0)
+	* with a combination of history and randomness
 * allow random draws from distributions for the players (variation in player preferences)
 * DONE calculate preference changes with city-block distance
 * calculate the outcome properly: 'constrained optimization problem'
 * adding and removing dimensions
+
+####To keep in mind for later:
 * visualization
 
 --------------------------------------
@@ -21,9 +24,9 @@ Output per treatment (1000 iterations):
 * Distance moved in the second dimension
 * Distance moved in the third dimension
 
-#####Play 27 games in total: 
+#####Play 27 games in total:
 
-Variation in status quo: 
+Variation in status quo:
 * mobile status quo: random draws
 * mobile status quo: with history
 * mobile status quo: with history plus random draws
