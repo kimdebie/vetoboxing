@@ -1,47 +1,26 @@
 # TO DO LIST
-#### As discussed on 22/02
-* DONE add more veto players, and allow for game with 0 veto players
-* DONE add iterations
-* let the status quo change for each iteration:
-	* DONE with history: the new status quo is the outcome
-	* DONE with random draws from various distributions: normal, uniform, exponential, paretian (mean of 0)
-	* with a combination of history and randomness
-* allow random draws from distributions for the players (variation in player preferences)
-* DONE calculate preference changes with city-block distance
+* make players' preferences flexible
 * calculate the outcome properly: 'constrained optimization problem'
-* adding and removing dimensions
+* allow for more than 3 dimensions
+	* fix CSV output for more than 3
+	* adapt addRandomPoints()
+* better error catching
+* profiling
+* better CSV outputs. store constants separately or at top of file
+* do better job at filenames (automatically include model name etc)
 
-####To keep in mind for later:
-* visualization
-
---------------------------------------
+-------------------------------------
 
 ##### Generate vectors of policy changes as output (write to csv?)
-Output per treatment (1000 iterations):
-* Pythagorean distance
-* City-block distance
-* Distance moved in the first dimension
-* Distance moved in the second dimension
-* Distance moved in the third dimension
+1000 trials:
+1.) Baseline VP model (random draw SQ - no history)
+2.) DVP model (random walk SQ - with history)
+3.) DVP model (random walk SQ - with history and biased drift)
+4.) DVP model (random walk SQ - with history and biased drift, and preferences with drift)
 
-#####Play 27 games in total:
+Run 1-4 for 1, 2, and 3 dimensions
+Run all under majority rule with 1, 2, and 3 veto players with 5 players total.
 
-Variation in status quo:
-* mobile status quo: random draws
-* mobile status quo: with history
-* mobile status quo: with history plus random draws
-
-Variation in the number of veto players:
-* 0 veto players
-* 1 veto players
-* 2 veto players
-
-Variation in the input distributions:
-* Normal distribution
-* Uniform distribution
-* Exponential distribution
-
-For each of the 27 games (3x3x3), save the 5 variables above.
 
 -------------------------------------
 

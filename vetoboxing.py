@@ -6,7 +6,7 @@
 ''
 '' by: Kim de Bie
 '' created: 2 February 2016
-'' last updated: 1 March 2016
+'' last updated: 23 March 2016
 ''
 '''''''''
 
@@ -19,6 +19,7 @@ import math
 from scipy.spatial import distance as dist
 import csv
 import operator
+import itertools
 
 
 #----------------------------------------------------------------------------------------------------#
@@ -32,31 +33,33 @@ For each variable, a value should be entered as per the input specifications.
 
 # number of runs of the simulation
 # input: any integer > 0
-runs 				= 20
+runs 				= 500
 
 # the method used to calculate distance between to points
 # input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
-distance_type 		= 'city-block'
+distance_type 		= 'pyth'
 
 # the number of dimensions that the game uses
-# input: an integer > 1
-number_dimensions 	= 2
+# input: 1, 2, 3 TODO: extend to more dimensions
+number_dimensions 	= 3
 
 # the preferences of the voters
-# input: two-dimensional point with floats. List may be extended with more voters
-voter_A 			= (1.0,1.0)
-voter_B				= (8.0,4.0)
-voter_C 			= (3.0,8.0)
-voter_D 			= (2.0,4.5)
-voter_E 			= (2.5,5.5)
+# input: point with floats. List may be extended with more voters
+# NOTE: in 1 dimension, input voter values like so: (1,0,)
+voter_A 			= (1.0,3.0,4.5)
+voter_B				= (4.0,2.5,3.5)
+voter_C 			= (3.0,6.0,2.0)
+voter_D 			= (2.0,4.5,2.5)
+voter_E 			= (2.5,3.5,5.0)
 
 # vector with the voters
 # input: the names of all voters
 voters 				= [voter_A, voter_B, voter_C, voter_D, voter_E]
 
-# determine the status quo
-# input: two-dimensional point with floats
-status_quo 			= (5.0,5.0)
+# determine the initial status quo
+# input: point with floats
+# NOTE: in 1 dimension, input status quo like so: (1,0,)
+status_quo 			= (5.0,4.5,4.0)
 
 # the agenda setter
 # input: one of the voters, NOT a veto player
@@ -64,18 +67,42 @@ agenda_setter 		= voter_B
 
 # determine who the veto players are
 # input: any, or none, of the voters, NOT the agenda setter
-veto_players 		= []
+veto_players 		= [voter_A, voter_C, voter_E]
 
 # determine whether status quo changes for each iteration
-# input: 'no', 'history', 'random', 'history and random'
-alter_status_quo	= 'history'
+# input: 'no', 'random', 'history', 'history and drift'
+alter_status_quo	= 'history and drift'
+
+# set the drift in each dimension for the status quo
+# input: a list with the drift in each(!) dimension
+# only required when alter_status_quo = 'history and drift'
+drift_status_quo	= [1.0, 0.5, -0.5]
+
+# determine whether preferences for voters change for each iteration
+# input: 'no', 'drift'
+alter_preferences	= 'no'
+
+# set the drift in each dimension for the voter
+drift_players		= [1]
 
 # determine what type of distribution is used for random draws
 # input: 'normal', 'uniform', 'exponential', 'paretian'
 distribution_type	= 'normal'
 
+# determine what method is used for picking optimal point
+# input: 0, 1		where 0 = point-grid, 1 = constrained optimization
+dummy_type			= 0
+
+# determine how large the grid should be
+# input: positive integer
+grid_size 			= 10
+
+# determine the interval at which points should be placed in grid
+# input: positive float
+breaks 				= 0.5
+
 # boolean that determines if results are saved in csv
-# input: True or False
+# input: True, False
 save_results 		= True
 
 # filename for saving results
@@ -87,29 +114,60 @@ filename 			= 'results.csv'
 def simulation():
 
 	'''
-	Function to run the simulation.
+	Function to run the simulation. Here, all different parts of the simulation come together. Reading it
+	will give you a general understanding of the logic of this script. In adddition, all variables that
+	are ultimately saved to csv are stored in this function.
 	'''
 
 	# results will be stored in an array
 	final_results = []
 
+	# add random points on a grid
+	# grid stays constant for every run
+	random_points = addRandomPoints(grid_size, breaks)
+
 	for run in range(runs):
 
 		print 'Simulation number', run+1, 'running...'
-		print status_quo
 
 		# array to store results of current iteration
 		current_results = []
 
-		# add random points on a grid
-		random_points = addRandomPoints(10, 10, 0.1)
+		# append the preferences of the players (for the existing players) to results
+		for i in range(0,5):
+			try:
+				current_results.append(voters[i])
+			except:
+				current_results.append('NA')
 
-		# which points are candidates?
-		# should be in preference circles of both agenda setter and veto players
-		points_in_circle = pointsInWinset(random_points)
+		# append the preferences of the veto players (for those present) to results
+		for i in range(0,3):
+			try:
+				current_results.append(veto_players[i])
+			except:
+				current_results.append('NA')
 
-		# select the preferred point and append it to results
-		outcome = closestToAgendaSetter(points_in_circle)
+		# append the status quo to results
+		current_results.append(status_quo)
+
+		# determine the coalitions that can be formed to get to a majority
+		possible_coalitions = determineCoalitions()
+
+		# this will store the outcome selected by each coalition
+		possible_outcomes = []
+
+		# determine the possible outcomes based on different coalitions
+		for coalition in possible_coalitions:
+			# select the points that are in the winset for the current coalition
+			points_in_circle = pointsInWinset(random_points, coalition)
+
+			# determine coalition's preference and append to all outcomes
+			possible_outcome = closestToAgendaSetter(points_in_circle)
+			possible_outcomes.append(possible_outcome)
+
+		# select the point preferred by the agenda setter out of all
+		# possible coalitions, and append to results
+		outcome = closestToAgendaSetter(possible_outcomes)
 		current_results.append(outcome)
 
 		# determine the euclidian distance that was travelled in this run and append to results
@@ -117,19 +175,38 @@ def simulation():
 		current_results.append(total_pyth_dist)
 
 		# determine the manhattan distance that was travelled in this run and append to results
-		total_eucl_dist = determineDistance(outcome, status_quo, 'city-block')
-		current_results.append(total_eucl_dist)
+		total_manh_dist = determineDistance(outcome, status_quo, 'city-block')
+		current_results.append(total_manh_dist)
 
-		# determine the distance travelled in each dimension
-		for i in range(number_dimensions):
-			distance = determineDistance(outcome[i], status_quo[i])
-			current_results.append(distance)
+		# determine the distance travelled in each dimension and append to results
+		for i in range(0,3):
+			try:
+				distance = determineDistance(outcome[i], status_quo[i])
+				current_results.append(distance)
+			except:
+				distance = determineDistance(outcome, status_quo)
+				current_results.append(distance)
+
+		# append number of dimensions to results
+		current_results.append(number_dimensions)
+
+		# append number of veto players to results
+		current_results.append(len(veto_players))
+
+		# append model type to results
+		current_results.append(alter_status_quo)
+
+		# append dummy for optimization type to results
+		current_results.append(dummy_type)
 
 		# results added to overall results
 		final_results.append(current_results)
 
-		# set the new iteration
-		setNewIteration(outcome)
+		# set the new status quo
+		alterStatusQuo(outcome)
+
+		# set the new players' preferences
+		alterPlayerPreferences()
 
 	# save results to a csv file
 	if save_results == True:
@@ -139,46 +216,57 @@ def simulation():
 	return final_results
 
 
-def addRandomPoints(height, width, breaks):
+def addRandomPoints(size, breaks):
 
 	'''
 	Quick solution to the problem of calculating the position of points on cutoffs of circles. Points
 	are systematically added to a grid of a given height and width, at set intervals.
+	TODO: make this a LOT prettier :-) (recursion?)
 	'''
 
 	points = []
 
-	for i in np.arange(0, height, breaks):
-
-		for j in np.arange(0, width, breaks):
-
-			point = (float(i),float(j))
+	if number_dimensions == 1:
+		for i in np.arange(0, size, breaks):
+			point = (float(i))
 			points.append(point)
+
+	elif number_dimensions == 2:
+		for i in np.arange(0, size, breaks):
+			for j in np.arange(0, size, breaks):
+				point = (float(i),float(j))
+				points.append(point)
+
+	elif number_dimensions == 3:
+		for i in np.arange(0, size, breaks):
+			for j in np.arange(0, size, breaks):
+				for k in np.arange(0, size, breaks):
+					point = (float(i), float(j), float(k))
+					points.append(point)
 
 	return points
 
 
-def pointsInWinset(random_points):
+def pointsInWinset(random_points, voter_selection):
 
 	'''
 	Function to determine which points fall inside the preference circles of both the agenda
 	setter and all veto players, as well as possible additional players required to get to
 	a majority. Thus, a first selection of elegible points is made: the 'winner'
 	must be in this set; otherwise it is the status quo.
+	This function is first used to determine the optimum within each coalition, and then
+	to determine the final outcome: the optimal point across all coalitions.
 	'''
 
 	# points will be stored in this array
 	selected_points = []
-
-	# check which voters need to approve a proposal
-	voters_needed = determineMajority()
 
 	# determining the radius of agenda setter: how far away can points be to still be inside circle?
 	as_radius = determineDistance(agenda_setter, status_quo)
 
 	# determining the radius for all relevant players
 	voter_radius = []
-	for voter in voters_needed:
+	for voter in voter_selection:
 		radius = determineDistance(voter, status_quo)
 		voter_radius.append(radius)
 
@@ -187,18 +275,24 @@ def pointsInWinset(random_points):
 
 	for point in random_points:
 
-		# check if point is inside preference circle of agenda setter
-		if ((agenda_setter[0] - point[0])**2 + (agenda_setter[1] - point[1])**2) < as_radius**2:
+		# determine the distance of point to agenda setter
+		distance_point_as = determineDistance(agenda_setter, point)
 
-			# so far, the point has not been vetoed
+		# check if point is inside preference circle of agenda setter
+		if distance_point_as < as_radius:
+
+			# so far, the point has not been vetoed: the AS may propose it
 			point_vetoed = False
 
 			# check with each voter if point is OK
-			for i, player in enumerate(voters_needed):
+			for i, player in enumerate(voter_selection):
 
-					# check if point is outside preference circle: it will be vetoed
-					if ((voters_needed[i][0] - point[0])**2 + (voters_needed[i][1] - point[1])**2) > voter_radius[0]**2:
-						point_vetoed = True
+				# determine the distance of point to every voter
+				distance_point_voter = determineDistance(voter_selection[i], point)
+
+				# check if point is outside preference circle: it will be vetoed
+				if distance_point_voter > voter_radius[i]:
+					point_vetoed = True
 
 			# if a point was not vetoed by anyone, it can be appended
 			if point_vetoed == False:
@@ -206,13 +300,15 @@ def pointsInWinset(random_points):
 
 	return selected_points
 
-def determineMajority():
+def determineCoalitions():
+	'''
+	This function will be used to determine which possible coalitions can form a majority. It checks
+	how many more (if any) voters are needed besides the veto players and the agenda setter (which
+	are always required to vote for a proposal), and creates all possible combinations of voters.
+	'''
 
-	'''
-	Function to determine which voters are needed. The function determines who, in addition to
-	the veto players and the agenda setter, are needed to get a majority. For this, the players
-	closest to the agenda setter (in addition to the veto players) are selected.
-	'''
+	# variable to store all possible coalitions
+	possible_coalitions = []
 
 	# variable to store the required voters: the agenda setter...
 	required_voters = [agenda_setter]
@@ -227,34 +323,33 @@ def determineMajority():
 		# if they are not: determine how many more voters are needed
 		more_voters = int(math.ceil(0.5 * len(voters) - len(veto_players) - 1))
 
-		# this array will contain potential voters and their distances to the agenda setter
-		possible_voters = []
-
-		# determine the distance of each voter to the agenda setter
+		# the voters that are not yet in the required_voters (the not-AS & VPs)
+		normal_voters = []
 		for voter in voters:
-			# exclude voters that are already in the list of required voters
 			if voter not in required_voters:
+				normal_voters.append(voter)
 
-				distance = determineDistance(voter, agenda_setter)
-				voter_distance = (voter, distance)
-				possible_voters.append(voter_distance)
+		# the combinations of voters that can be added to the required voters to get a coalition
+		coalition_extensions = itertools.combinations(normal_voters, more_voters)
 
-		# sort the voters by their distance to the agenda setter
-		# from https://stackoverflow.com/questions/3121979/how-to-sort-list-tuple-of-lists-tuples
-		sorted_voters = sorted(possible_voters, key=lambda tup: tup[1])
-
-		# add the number of voters required to make a majority
-		for i in range(more_voters):
-			required_voters.append(sorted_voters[i][0])
-
-	return required_voters
+		# add every coalition (required + extension) to list of possible coalitions
+		for extension in coalition_extensions:
+			possible_coalition = required_voters + list(extension)
+			possible_coalitions.append(possible_coalition)
 
 
+	# if VPs and agenda setter are already a majority, they are the only coalition
+	else:
+		possible_coalitions.append(required_voters)
 
-def closestToAgendaSetter(points_in_circle):
+	return possible_coalitions
+
+
+def closestToAgendaSetter(points_in_selection):
 
 	'''
-	This function determines which point from a given array is closest to the agenda setter. This
+	This function determines which point from a given array is closest to the agenda setter. It takes all
+	points that a have a theoretical majority; now the point is to determine which the AS likes most. This
 	will be the most-preferred point and the outcome of the veto-player game. If there is no point that
 	lies in the preference circles of all veto players and the agenda setter, this function returns the
 	status quo.
@@ -263,13 +358,13 @@ def closestToAgendaSetter(points_in_circle):
 	preferred_point = ''
 
 	# if there are no points inside all preference circles, the outcome will be the status quo
-	if len(points_in_circle) == 0:
+	if len(points_in_selection) == 0:
 		preferred_point = status_quo
 
 	else:
 		lowest_distance_to_as = ''
 
-		for point in points_in_circle:
+		for point in points_in_selection:
 
 			# determine the distance of each eligible point to the agenda setter
 			distance = determineDistance(point, agenda_setter)
@@ -306,80 +401,76 @@ def determineDistance(point1, point2, set_type=distance_type):
 
 
 
-def setNewIteration(outcome):
+def alterStatusQuo(outcome):
 
 	'''
-	This function sets the parameters for a new iteration. If so defined in the global variables at
-	the top of this document, new values are chosen for the status quo and/or players.
+	This function sets the status quo for the new simulation. Based on the parameters
+	defined at the top of the document, a new value for the status quo is picked.
 	'''
 	# first, check if the status quo should be altered
 	global status_quo
+	#history _ random error + biased drift
 
-	# alter status quo based on outcome of previous run
-	if alter_status_quo == 'history':
-		status_quo = outcome
+	# because of the flexible number of dimensions (and because it is not possible
+	# to append to a tuple), the points are first stored in a list and the status
+	# quo is also stored as a list
+	status_quo = list(status_quo)
+	new_status_quo = []
 
-	# alter status quo based on random draws from distributions
-	elif alter_status_quo == 'random':
+	# picking the appropriate distribution to draw from
+	if distribution_type == 'normal':
+		vibration = randomNormal()
+	elif distribution_type == 'uniform':
+		vibration = randomUniform()
+	elif distribution_type == 'exponential':
+		vibration = randomExponential()
+	elif distribution_type == 'paretian':
+		vibration = randomPareto()
+	else:
+		print 'Distribution type undefined. Cannot set up new simulation'
 
-		# normal distribution
-		if distribution_type == 'normal':
-			def randomNormal():
-				return np.random.normal(loc=5.0, scale=1.0)
-			status_quo = (randomNormal(), randomNormal())
+	# if the status quo is not altered, it vibrates nonetheless
+	if alter_status_quo == 'no':
+		for i in range(number_dimensions):
+			dim = status_quo[i] - vibration
+			new_status_quo.append(dim)
 
-		# uniform distribution
-		elif distribution_type == 'uniform':
-			def randomUniform():
-				return np.random.uniform(low=0.0, high=10.0)
-			status_quo = (randomUniform(), randomUniform())
+	# pick a new, completely random status quo - and vibrate it
+	if alter_status_quo == 'random':
+		for i in range(number_dimensions):
+			dim = np.random.uniform(0.0, 10.0) - vibration
+			new_status_quo.append(dim)
 
-		# exponential distribution
-		elif distribution_type == 'exponential':
-			def randomExponential():
-				return np.random.exponential(scale=1.0)
-			status_quo = (randomExponential(), randomExponential())
-
-		# paretian distribution
-		elif distribution_type == 'paretian':
-			def randomPareto():
-				return np.random.pareto(5)
-			status_quo = (randomPareto(), randomPareto())
-
+	# alter status quo based on outcome of previous run, and vibration
+	elif alter_status_quo == 'history':
+		#outcome temporarily stored as list
+		if not isinstance(outcome, tuple):
+			dim = outcome - vibration
+			new_status_quo.append(dim)
 		else:
-			print 'Distribution type undefined'
+			outcome = list(outcome)
+			for i in range(number_dimensions):
+				dim = outcome[i] - vibration
+				new_status_quo.append(dim)
 
-
-	elif alter_status_quo == 'history and random':
-		# normal distribution
-		if distribution_type == 'normal':
-			def randomNormal():
-				return np.random.normal(loc=5.0, scale=1.0)
-			status_quo = (randomNormal(), randomNormal())
-
-		# uniform distribution
-		elif distribution_type == 'uniform':
-			def randomUniform():
-				return np.random.uniform(low=0.0, high=10.0)
-			status_quo = (randomUniform()+, randomUniform())
-
-		# exponential distribution
-		elif distribution_type == 'exponential':
-			def randomExponential():
-				return np.random.exponential(scale=1.0)
-			status_quo = (randomExponential(), randomExponential())
-
-		# paretian distribution
-		elif distribution_type == 'paretian':
-			def randomPareto():
-				return np.random.pareto(5)
-			status_quo = (randomPareto(), randomPareto())
-
+	# alter status quo based on outcome of previous run, drift, and vibration
+	elif alter_status_quo == 'history and drift':
+		#outcome temporarily stored as list
+		if not isinstance(outcome, tuple):
+			dim = outcome - vibration + drift_status_quo[0]
+			new_status_quo.append(dim)
 		else:
-			print 'Distribution type undefined'
+			outcome = list(outcome)
+			for i in range(number_dimensions):
+				dim = outcome[i] - vibration + drift_status_quo[i]
+				new_status_quo.append(dim)
 
-	#TODO this function should also be able to alter the player's preferences based on the outcome
+	# status quo is stored as a tuple again, as it was before
+	status_quo = tuple(new_status_quo)
 
+
+def alterPlayerPreferences():
+	return ''
 
 def saveResults(file, results):
 
@@ -392,7 +483,10 @@ def saveResults(file, results):
 	print 'Saving results to csv...'
 
 	# first row contains variable names
-	writer.writerow(['Outcome', 'Euclidean distance', 'Manhattan Distance', 'First dimension', 'Second dimension', 'Third dimension'])
+	writer.writerow(['Voter_A', 'Voter_B', 'Voter_C', 'Voter_D', 'Voter_E',
+		'VP_1', 'VP_2', 'VP_3', 'Status Quo', 'Policy Decision', 'Total Euclidean Distance',
+		'Total Manhattan Distance', 'Distance first dimension', 'Distance second dimension',
+		'Distance third dimension', 'Number of dimensions', 'Number of VPs', 'Model', 'Optimization?'])
 
 	# write all result-rows to csv
 	for result in results:
@@ -401,6 +495,72 @@ def saveResults(file, results):
 	print 'Done! Find your results in', filename
 
 
+
+#----------------------------------------------------------------------------------------------------#
+
+# Minor functions that aid the functions above
+
+# random draws from a normal distribution
+# currently mean is set at 1, standard deviation at 0.25
+def randomNormal():
+	return np.random.normal(1.0, 0.25)
+
+# TODO currently only randomNormal is used, check how appropriate
+# the values for the other distributions are
+def randomUniform():
+	return np.random.uniform(low=0.0, high=10.0)
+
+def randomExponential():
+	return np.random.exponential(scale=1.0)
+
+def randomPareto():
+	return np.random.pareto(5)
+
+#----------------------------------------------------------------------------------------------------#
+# Currently unused function
+def oldDetermineMajority():
+
+	'''
+	Function to determine which voters are needed. The function determines who, in addition to
+	the veto players and the agenda setter, are needed to get a majority. For this, the players
+	closest to the agenda setter (in addition to the veto players) are selected.
+	This method proved incorrect (leaving it here for potential later use - just in case).
+	'''
+
+	# variable to store the required voters: the agenda setter...
+	required_voters = [agenda_setter]
+
+	# ... and all veto players
+	for player in veto_players:
+		required_voters.append(player)
+
+	# check if veto players and the agenda setter are a majority by themselves
+	if len(required_voters) < 0.5 * len(voters):
+
+		# if they are not: determine how many more voters are needed
+		more_voters = int(math.ceil(0.5 * len(voters) - len(veto_players) - 1))
+
+		# this array will contain potential voters and their distances to the agenda setter
+		possible_voters = []
+
+		# determine the distance of each voter to the agenda setter
+		for voter in voters:
+			# exclude voters that are already in the list of required voters
+			if voter not in required_voters:
+
+				distance = determineDistance(voter, agenda_setter)
+				voter_distance = (voter, distance)
+				possible_voters.append(voter_distance)
+
+		# sort the voters by their distance to the agenda setter
+		# from https://stackoverflow.com/questions/3121979/how-to-sort-list-tuple-of-lists-tuples
+		sorted_voters = sorted(possible_voters, key=lambda tup: tup[1])
+
+		# add the number of voters required to make a majority
+		for i in range(more_voters):
+			required_voters.append(sorted_voters[i][0])
+
+	return required_voters
 
 #----------------------------------------------------------------------------------------------------#
 
