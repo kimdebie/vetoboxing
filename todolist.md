@@ -8,15 +8,16 @@
 * profiling
 * better CSV outputs. store constants separately or at top of file
 * do better job at filenames (automatically include model name etc)
+* formatting of files can be improved
 
 -------------------------------------
 
 ##### Generate vectors of policy changes as output (write to csv?)
 1000 trials:
-1.) Baseline VP model (random draw SQ - no history)
-2.) DVP model (random walk SQ - with history)
-3.) DVP model (random walk SQ - with history and biased drift)
-4.) DVP model (random walk SQ - with history and biased drift, and preferences with drift)
+1. Baseline VP model (random draw SQ - no history)
+2. DVP model (random walk SQ - with history)
+3. DVP model (random walk SQ - with history and biased drift)
+4. DVP model (random walk SQ - with history and biased drift, and preferences with drift)
 
 Run 1-4 for 1, 2, and 3 dimensions
 Run all under majority rule with 1, 2, and 3 veto players with 5 players total.
