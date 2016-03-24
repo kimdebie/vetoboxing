@@ -16,7 +16,7 @@ where:
 1, 2 or 3 vetoplayers
 
 
-NOTE: The distances for all dimensions are entered, even when they are not actually present. This can be ignored for now (it calculates the total distance travelled for the non-existing dimensions).
+NOTE: The distances for all dimensions are entered, even when they are not actually present. This can be ignored for now (it calculates the total distance travelled for the non-existing dimensions). (24/03 this issue is now fixed for new files)
 
 NOTES ON SPEED:
 * adding dimensions slows down the simulation. I added only 500 runs for the two- and three-dimensional simulations. Also, for the 3-dimensional I set 'breaks' (determines the distance between points on the grid) at 0.5 instead of 0.1 (as I did for 1 and 2-dimensional)
