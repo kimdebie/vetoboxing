@@ -27,6 +27,26 @@ import time
 
 #----------------------------------------------------------------------------------------------------#
 
+# CLASSES AND GLOBAL VARIABLES
+# no need to touch this part
+'''
+Class that stores position of a voter, whether they are an agenda setter or
+veto player or not.
+'''
+
+class Voter(object):
+    def __init__(self, position, agenda_setter, veto_player):
+        self.position = position
+        self.agenda_setter = agenda_setter
+        self.veto_player = veto_player
+
+# set up additional global variables - no need to touch!
+model_number = None
+agenda_setter = ''
+veto_players = []
+
+#----------------------------------------------------------------------------------------------------#
+
 # GLOBAL VARIABLES
 
 '''
@@ -46,17 +66,14 @@ distance_type 		= 'pyth'
 # input: 1, 2, 3 TODO: extend to more dimensions
 number_dimensions 	= 3
 
-# the preferences of the voters
-# input: point with floats. List may be extended with more voters
+# setting up the voters
+# input layout: Voter ( (POSITION), AS, VP )
 # NOTE: in 1 dimension, input voter values like so: (1,0,)
-voters.a
-
-
-voters.a 			= (1.0,3.0,4.5)
-voters.b			= (4.0,2.5,3.5)
-voters.c			= (3.0,6.0,2.0)
-voters.d 			= (2.0,4.5,2.5)
-voters.e 			= (2.5,3.5,5.0)
+voter_A 			= Voter((1.0,3.0,4.5), False, True)
+voter_B				= Voter((4.0,2.5,3.5), True, False)
+voter_C 			= Voter((3.0,6.0,2.0), False, True)
+voter_D 			= Voter((2.0,4.5,2.5), False, False)
+voter_E 			= Voter((2.5,3.5,5.0), False, False)
 
 # vector with the voters
 # input: the names of all voters
@@ -66,14 +83,6 @@ voters 				= [voter_A, voter_B, voter_C, voter_D, voter_E]
 # input: point with floats
 # NOTE: in 1 dimension, input status quo like so: (1,0,)
 status_quo 			= (5.0,4.5,4.0)
-
-# the agenda setter
-# input: one of the voters, NOT a veto player
-agenda_setter 		= voter_B
-
-# determine who the veto players are
-# input: any, or none, of the voters, NOT the agenda setter
-veto_players 		= [voter_A, voter_C, voter_E]
 
 # determine whether status quo changes for each iteration
 # input: 'no', 'random', 'history', 'history and drift'
@@ -115,9 +124,6 @@ save_results 		= True
 # input: 'FOLDERNAME' (only mandatory when save_results is True)
 folder				= 'RESULTS'
 
-# set model number for csv
-model_number = ''
-
 
 #----------------------------------------------------------------------------------------------------#
 
@@ -128,6 +134,16 @@ def simulation():
 	will give you a general understanding of the logic of this script. In adddition, all variables that
 	are ultimately saved to csv are stored in this function.
 	'''
+	# set up agenda setter
+	global agenda_setter
+	for voter in voters:
+		if voter.agenda_setter == True:
+			agenda_setter = voter
+
+	# set up array for veto players
+	for voter in voters:
+		if voter.veto_player == True:
+			veto_players.append(voter)
 
 	# results will be stored in an array
 	final_results = []
@@ -150,14 +166,14 @@ def simulation():
 		# append the preferences of the players (for the existing players) to results
 		for i in range(0,5):
 			try:
-				current_results.append(voters[i])
+				current_results.append(voters[i].position)
 			except:
 				current_results.append('NA')
 
 		# append the preferences of the veto players (for those present) to results
 		for i in range(0,3):
 			try:
-				current_results.append(veto_players[i])
+				current_results.append(veto_players[i].position)
 			except:
 				current_results.append('NA')
 
@@ -277,12 +293,12 @@ def pointsInWinset(random_points, voter_selection):
 	selected_points = []
 
 	# determining the radius of agenda setter: how far away can points be to still be inside circle?
-	as_radius = determineDistance(agenda_setter, status_quo)
+	as_radius = determineDistance(agenda_setter.position, status_quo)
 
 	# determining the radius for all relevant players
 	voter_radius = []
 	for voter in voter_selection:
-		radius = determineDistance(voter, status_quo)
+		radius = determineDistance(voter.position, status_quo)
 		voter_radius.append(radius)
 
 	# to determine if points are inside a circle:
@@ -291,7 +307,7 @@ def pointsInWinset(random_points, voter_selection):
 	for point in random_points:
 
 		# determine the distance of point to agenda setter
-		distance_point_as = determineDistance(agenda_setter, point)
+		distance_point_as = determineDistance(agenda_setter.position, point)
 
 		# check if point is inside preference circle of agenda setter
 		if distance_point_as < as_radius:
@@ -303,7 +319,7 @@ def pointsInWinset(random_points, voter_selection):
 			for i, player in enumerate(voter_selection):
 
 				# determine the distance of point to every voter
-				distance_point_voter = determineDistance(voter_selection[i], point)
+				distance_point_voter = determineDistance(voter_selection[i].position, point)
 
 				# check if point is outside preference circle: it will be vetoed
 				if distance_point_voter > voter_radius[i]:
@@ -316,6 +332,7 @@ def pointsInWinset(random_points, voter_selection):
 	return selected_points
 
 def determineCoalitions():
+
 	'''
 	This function will be used to determine which possible coalitions can form a majority. It checks
 	how many more (if any) voters are needed besides the veto players and the agenda setter (which
@@ -382,7 +399,7 @@ def closestToAgendaSetter(points_in_selection):
 		for point in points_in_selection:
 
 			# determine the distance of each eligible point to the agenda setter
-			distance = determineDistance(point, agenda_setter)
+			distance = determineDistance(point, agenda_setter.position)
 
 			# if the current point is closest to the agenda setter compared to the points considered
 			# so far, that point must be saved
@@ -476,6 +493,7 @@ def alterStatusQuo(outcome):
 
 
 def alterPlayerPreferences():
+
 	'''
 	Function to alter the preferences of the players for every run. Two options: preferences
 	do not change (yet there is some vibration), or preferences have a drift in a certain
@@ -484,27 +502,45 @@ def alterPlayerPreferences():
 
 	global voters
 
-	new_voters = []
-
 	# setting the appropriate vibration type
 	vibration = setVibration()
 
+	# if the preferences are not altered, there is still vibration
 	if alter_preferences == 'no':
+
+		# apply changes to every voter
 		for i, voter in enumerate(voters):
-			voter = list(voters[i])
+			# set up list for new voter
 			new_voter = []
-			for j in range(number_dimensions):
-				dim = voter[j] - vibration
+			#check if one-dimensional voter (different method)
+			if not isinstance (voters[i].position, tuple):
+				dim = voters[i].position - vibration
 				new_voter.append(dim)
-			new_voters.append(tuple(new_voter))
+			else:
+				voter = list(voters[i].position)
+				for j in range(number_dimensions):
+					dim = voter[j] - vibration
+					new_voter.append(dim)
+			voters[i].position = tuple(new_voter)
 
 	elif alter_preferences == 'drift':
-		print 'hi'
+
+			# apply changes to every voter
+			for i, voter in enumerate(voters):
+				# set up list for new voter
+				new_voter = []
+				#check if one-dimensional voter (different method)
+				if not isinstance (voters[i].position, tuple):
+					dim = voters[i].position - vibration + drift[0]
+				else:
+					voter = list(voters[i].position)
+					for j in range(number_dimensions):
+						dim = voter[j] - vibration + drift[j]
+						new_voter.append(dim)
+				voters[i].position = tuple(new_voter)
 
 	else:
 		print 'alter_preferences was not defined correctly.'
-
-	voters = new_voters
 
 
 def saveResults(results):
