@@ -36,7 +36,7 @@ For each variable, a value should be entered as per the input specifications.
 
 # number of runs of the simulation
 # input: any integer > 0
-runs 				= 1
+runs 				= 3
 
 # the method used to calculate distance between to points
 # input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
@@ -49,11 +49,14 @@ number_dimensions 	= 3
 # the preferences of the voters
 # input: point with floats. List may be extended with more voters
 # NOTE: in 1 dimension, input voter values like so: (1,0,)
-voter_A 			= (1.0,3.0,4.5)
-voter_B				= (4.0,2.5,3.5)
-voter_C 			= (3.0,6.0,2.0)
-voter_D 			= (2.0,4.5,2.5)
-voter_E 			= (2.5,3.5,5.0)
+voters.a
+
+
+voters.a 			= (1.0,3.0,4.5)
+voters.b			= (4.0,2.5,3.5)
+voters.c			= (3.0,6.0,2.0)
+voters.d 			= (2.0,4.5,2.5)
+voters.e 			= (2.5,3.5,5.0)
 
 # vector with the voters
 # input: the names of all voters
@@ -112,23 +115,8 @@ save_results 		= True
 # input: 'FOLDERNAME' (only mandatory when save_results is True)
 folder				= 'RESULTS'
 
-
-#----------------------------------------------------------------------------------------------------#
-
-# SETTING UP ADDITIONAL VARIABLES - NO NEED TO EDIT
-
-if alter_status_quo == 'no':
-	model_number = 0
-elif alter_status_quo == 'random':
-	model_number = 1
-elif alter_status_quo == 'history':
-	model_number = 2
-elif alter_status_quo == 'history and drift' and alter_preferences == 'no':
-	model_number = 3
-elif alter_status_quo == 'history and drift' and alter_preferences == 'drift':
-	model_number = 4
-else:
-	model_number = 'NA'
+# set model number for csv
+model_number = ''
 
 
 #----------------------------------------------------------------------------------------------------#
@@ -147,6 +135,10 @@ def simulation():
 	# add random points on a grid
 	# grid stays constant for every run
 	random_points = addRandomPoints(grid_size, breaks)
+
+	# set model number for csv
+	global model_number
+	model_number = setModelNumber()
 
 	for run in range(runs):
 
@@ -440,17 +432,8 @@ def alterStatusQuo(outcome):
 	status_quo = list(status_quo)
 	new_status_quo = []
 
-	# picking the appropriate distribution to draw from
-	if distribution_type == 'normal':
-		vibration = randomNormal()
-	elif distribution_type == 'uniform':
-		vibration = randomUniform()
-	elif distribution_type == 'exponential':
-		vibration = randomExponential()
-	elif distribution_type == 'paretian':
-		vibration = randomPareto()
-	else:
-		print 'Distribution type undefined. Cannot set up new simulation'
+	# setting the appropriate vibration type
+	vibration = setVibration()
 
 	# if the status quo is not altered, it vibrates nonetheless
 	if alter_status_quo == 'no':
@@ -493,7 +476,36 @@ def alterStatusQuo(outcome):
 
 
 def alterPlayerPreferences():
-	return ''
+	'''
+	Function to alter the preferences of the players for every run. Two options: preferences
+	do not change (yet there is some vibration), or preferences have a drift in a certain
+	direction.
+	'''
+
+	global voters
+
+	new_voters = []
+
+	# setting the appropriate vibration type
+	vibration = setVibration()
+
+	if alter_preferences == 'no':
+		for i, voter in enumerate(voters):
+			voter = list(voters[i])
+			new_voter = []
+			for j in range(number_dimensions):
+				dim = voter[j] - vibration
+				new_voter.append(dim)
+			new_voters.append(tuple(new_voter))
+
+	elif alter_preferences == 'drift':
+		print 'hi'
+
+	else:
+		print 'alter_preferences was not defined correctly.'
+
+	voters = new_voters
+
 
 def saveResults(results):
 
@@ -533,6 +545,50 @@ def saveResults(results):
 
 
 #----------------------------------------------------------------------------------------------------#
+
+# SETTING UP ADDITIONAL VARIABLES - NO NEED TO EDIT
+
+# setting model number (for diagnostics in csv)
+
+def setModelNumber():
+
+	'''
+	This function sets the model number of the simulation. It is only used for classifying the model
+	in the csv.
+	'''
+
+	if alter_status_quo == 'no':
+		return 0
+	elif alter_status_quo == 'random':
+		return 1
+	elif alter_status_quo == 'history':
+		return 2
+	elif alter_status_quo == 'history and drift' and alter_preferences == 'no':
+		return 3
+	elif alter_status_quo == 'history and drift' and alter_preferences == 'drift':
+		return 4
+	else:
+		return 'NA'
+
+
+def setVibration():
+	'''
+	This function picks the appropriate distribution to draw from
+	for the vibration of players and status quo.
+	'''
+	if distribution_type == 'normal':
+		return randomNormal()
+	elif distribution_type == 'uniform':
+		return randomUniform()
+	elif distribution_type == 'exponential':
+		return randomExponential()
+	elif distribution_type == 'paretian':
+		return randomPareto()
+	else:
+		print 'Distribution type undefined. Cannot set up new simulation'
+
+#----------------------------------------------------------------------------------------------------#
+
 
 # Minor functions that aid the functions above
 
