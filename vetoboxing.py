@@ -6,7 +6,7 @@
 ''
 '' by: Kim de Bie
 '' created: 2 February 2016
-'' last updated: 23 March 2016
+'' last updated: 24 March 2016
 ''
 '''''''''
 
@@ -18,8 +18,11 @@ import numpy as np
 import math
 from scipy.spatial import distance as dist
 import csv
+import os
 import operator
 import itertools
+import errno
+import time
 
 
 #----------------------------------------------------------------------------------------------------#
@@ -33,7 +36,7 @@ For each variable, a value should be entered as per the input specifications.
 
 # number of runs of the simulation
 # input: any integer > 0
-runs 				= 500
+runs 				= 1
 
 # the method used to calculate distance between to points
 # input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
@@ -105,9 +108,28 @@ breaks 				= 0.5
 # input: True, False
 save_results 		= True
 
-# filename for saving results
-# input: 'FILENAME.csv' (only mandatory when save_results is True)
-filename 			= 'results.csv'
+# folder for saving results
+# input: 'FOLDERNAME' (only mandatory when save_results is True)
+folder				= 'RESULTS'
+
+
+#----------------------------------------------------------------------------------------------------#
+
+# SETTING UP ADDITIONAL VARIABLES - NO NEED TO EDIT
+
+if alter_status_quo == 'no':
+	model_number = 0
+elif alter_status_quo == 'random':
+	model_number = 1
+elif alter_status_quo == 'history':
+	model_number = 2
+elif alter_status_quo == 'history and drift' and alter_preferences == 'no':
+	model_number = 3
+elif alter_status_quo == 'history and drift' and alter_preferences == 'drift':
+	model_number = 4
+else:
+	model_number = 'NA'
+
 
 #----------------------------------------------------------------------------------------------------#
 
@@ -181,11 +203,13 @@ def simulation():
 		# determine the distance travelled in each dimension and append to results
 		for i in range(0,3):
 			try:
-				distance = determineDistance(outcome[i], status_quo[i])
+				if number_dimensions == 1:
+					distance = determineDistance(outcome, status_quo)
+				else:
+					distance = determineDistance(outcome[i], status_quo[i])
 				current_results.append(distance)
 			except:
-				distance = determineDistance(outcome, status_quo)
-				current_results.append(distance)
+				current_results.append('NA')
 
 		# append number of dimensions to results
 		current_results.append(number_dimensions)
@@ -194,7 +218,7 @@ def simulation():
 		current_results.append(len(veto_players))
 
 		# append model type to results
-		current_results.append(alter_status_quo)
+		current_results.append(model_number)
 
 		# append dummy for optimization type to results
 		current_results.append(dummy_type)
@@ -210,8 +234,7 @@ def simulation():
 
 	# save results to a csv file
 	if save_results == True:
-		with open(filename, 'wb') as output_file:
-			saveResults(output_file, final_results)
+		saveResults(final_results)
 
 	return final_results
 
@@ -472,15 +495,28 @@ def alterStatusQuo(outcome):
 def alterPlayerPreferences():
 	return ''
 
-def saveResults(file, results):
+def saveResults(results):
 
 	'''
-	Function to save results to a csv file.
+	Function to save results to a csv file in a folder called RESULTS.
 	'''
 
-	writer = csv.writer(file)
+	# setting up a directory to store files called RESULTS
+	results_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], folder)
+	create_dir(results_dir)
+
+	# creating datestamp for file
+	timestr = time.strftime("%Y-%m-%d_%H%M")
+
+	# setting up the name of the file
+	filename = ''.join(('results', '-', str(model_number), '-', str(number_dimensions),
+	 	'-', str(len(veto_players)), '__', timestr, '.csv'))
+
 
 	print 'Saving results to csv...'
+
+	csv_file = os.path.join(results_dir, filename)
+	writer = csv.writer(open(csv_file, 'wb'))
 
 	# first row contains variable names
 	writer.writerow(['Voter_A', 'Voter_B', 'Voter_C', 'Voter_D', 'Voter_E',
@@ -515,6 +551,20 @@ def randomExponential():
 
 def randomPareto():
 	return np.random.pareto(5)
+
+def create_dir(directory):
+    '''
+    Create directory if needed.
+    '''
+
+    try:
+        os.makedirs(directory)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            pass
+        else:
+            raise
+
 
 #----------------------------------------------------------------------------------------------------#
 # Currently unused function

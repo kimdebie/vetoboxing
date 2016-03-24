@@ -7,7 +7,6 @@
 * better error catching
 * profiling
 * better CSV outputs. store constants separately or at top of file
-* do better job at filenames (automatically include model name etc)
 * formatting of files can be improved
 
 -------------------------------------

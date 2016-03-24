@@ -22,3 +22,5 @@ NOTES ON SPEED:
 * adding dimensions slows down the simulation. I added only 500 runs for the two- and three-dimensional simulations. Also, for the 3-dimensional I set 'breaks' (determines the distance between points on the grid) at 0.5 instead of 0.1 (as I did for 1 and 2-dimensional)
 * adding veto players speeds up the simulation. This makes sense, as only points within their pref circles are considered - garbage thrown out quicker. The difference between 1 and 2 veto players is much larger than the difference between 2 and 3 VPs.
 * modelnumber doesn't seem to matter much.
+
+UPDATE (24/03): Filenames (of new files) now also contain a time/datestamp
