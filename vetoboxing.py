@@ -34,11 +34,13 @@ Class that stores position of a voter, whether they are an agenda setter or
 veto player or not.
 '''
 
+
 class Voter(object):
-    def __init__(self, position, agenda_setter, veto_player):
-        self.position = position
-        self.agenda_setter = agenda_setter
-        self.veto_player = veto_player
+	def __init__(self, position, agenda_setter, veto_player):
+		self.position = position
+		self.agenda_setter = agenda_setter
+		self.veto_player = veto_player
+		self.original_position = position
 
 # set up additional global variables - no need to touch!
 model_number = None
@@ -56,7 +58,7 @@ For each variable, a value should be entered as per the input specifications.
 
 # number of runs of the simulation
 # input: any integer > 0
-runs 				= 3
+runs 				= 1000
 
 # the method used to calculate distance between to points
 # input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
@@ -64,16 +66,16 @@ distance_type 		= 'pyth'
 
 # the number of dimensions that the game uses
 # input: 1, 2, 3 TODO: extend to more dimensions
-number_dimensions 	= 3
+number_dimensions 	= 1
 
 # setting up the voters
 # input layout: Voter ( (POSITION), AS, VP )
 # NOTE: in 1 dimension, input voter values like so: (1,0,)
-voter_A 			= Voter((1.0,3.0,4.5), False, True)
-voter_B				= Voter((4.0,2.5,3.5), True, False)
-voter_C 			= Voter((3.0,6.0,2.0), False, True)
-voter_D 			= Voter((2.0,4.5,2.5), False, False)
-voter_E 			= Voter((2.5,3.5,5.0), False, False)
+voter_A 			= Voter((1.0,), False, True)
+voter_B				= Voter((4.0,), True, False)
+voter_C 			= Voter((3.0,), False, False)
+voter_D 			= Voter((2.0,), False, False)
+voter_E 			= Voter((2.5,), False, False)
 
 # vector with the voters
 # input: the names of all voters
@@ -82,23 +84,24 @@ voters 				= [voter_A, voter_B, voter_C, voter_D, voter_E]
 # determine the initial status quo
 # input: point with floats
 # NOTE: in 1 dimension, input status quo like so: (1,0,)
-status_quo 			= (5.0,4.5,4.0)
+status_quo 			= (5.0,4.5)
 
 # determine whether status quo changes for each iteration
 # input: 'no', 'random', 'history', 'history and drift'
 alter_status_quo	= 'history and drift'
 
 # set the drift in each dimension for the status quo
-# input: a list with the drift in each(!) dimension
+# input: a list with the drift in each(!) dimension (can be zero)
 # only required when alter_status_quo = 'history and drift'
-drift_status_quo	= [1.0, 0.5, -0.5]
+drift_status_quo	= [0.2,0.5,0.2]
 
 # determine whether preferences for voters change for each iteration
 # input: 'no', 'drift'
-alter_preferences	= 'no'
+alter_preferences	= 'drift'
 
 # set the drift in each dimension for the voter
-drift_players		= [1]
+# input: a list with the drift in each(!) dimension (can be zero), applied to every voter
+drift_players		= [0.2,0.5,0.1]
 
 # determine what type of distribution is used for random draws
 # input: 'normal', 'uniform', 'exponential', 'paretian'
@@ -110,11 +113,11 @@ dummy_type			= 0
 
 # determine how large the grid should be
 # input: positive integer
-grid_size 			= 10
+grid_size 			= 300
 
 # determine the interval at which points should be placed in grid
 # input: positive float
-breaks 				= 0.5
+breaks 				= 0.1
 
 # boolean that determines if results are saved in csv
 # input: True, False
@@ -506,38 +509,30 @@ def alterPlayerPreferences():
 	vibration = setVibration()
 
 	# if the preferences are not altered, there is still vibration
+	# movement from the initial position of the voter - at the start of the simulation
 	if alter_preferences == 'no':
 
 		# apply changes to every voter
 		for i, voter in enumerate(voters):
 			# set up list for new voter
 			new_voter = []
-			#check if one-dimensional voter (different method)
-			if not isinstance (voters[i].position, tuple):
-				dim = voters[i].position - vibration
+			voter = list(voters[i].original_position)
+			for j in range(number_dimensions):
+				dim = voter[j] + vibration
 				new_voter.append(dim)
-			else:
-				voter = list(voters[i].position)
-				for j in range(number_dimensions):
-					dim = voter[j] - vibration
-					new_voter.append(dim)
 			voters[i].position = tuple(new_voter)
 
 	elif alter_preferences == 'drift':
 
-			# apply changes to every voter
-			for i, voter in enumerate(voters):
-				# set up list for new voter
-				new_voter = []
-				#check if one-dimensional voter (different method)
-				if not isinstance (voters[i].position, tuple):
-					dim = voters[i].position - vibration + drift[0]
-				else:
-					voter = list(voters[i].position)
-					for j in range(number_dimensions):
-						dim = voter[j] - vibration + drift[j]
-						new_voter.append(dim)
-				voters[i].position = tuple(new_voter)
+		# apply changes to every voter
+		for i, voter in enumerate(voters):
+			# set up list for new voter
+			new_voter = []
+			voter = list(voters[i].position)
+			for j in range(number_dimensions):
+				dim = voter[j] + vibration + drift_players[j]
+				new_voter.append(dim)
+			voters[i].position = tuple(new_voter)
 
 	else:
 		print 'alter_preferences was not defined correctly.'
@@ -631,7 +626,7 @@ def setVibration():
 # random draws from a normal distribution
 # currently mean is set at 1, standard deviation at 0.25
 def randomNormal():
-	return np.random.normal(1.0, 0.25)
+	return np.random.normal(0, 0.2)
 
 # TODO currently only randomNormal is used, check how appropriate
 # the values for the other distributions are

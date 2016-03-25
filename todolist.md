@@ -4,11 +4,10 @@
 * allow for more than 3 dimensions
 	* fix CSV output for more than 3
 	* adapt addRandomPoints()
-* better error catching
-* profiling
+* better error catching - error checking module
+* profiling - determineDistance() is slow!
 * better CSV outputs. store constants separately or at top of file
-* formatting of files can be improved
-
+* write handbook for user
 -------------------------------------
 
 ##### Generate vectors of policy changes as output (write to csv?)
