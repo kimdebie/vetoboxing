@@ -6,7 +6,7 @@
 ''
 '' by: Kim de Bie
 '' created: 2 February 2016
-'' last updated: 24 March 2016
+'' last updated: 5 June 2016
 ''
 '''''''''
 
@@ -23,6 +23,9 @@ import operator
 import itertools
 import errno
 import time
+import error
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 
 
 #----------------------------------------------------------------------------------------------------#
@@ -33,7 +36,6 @@ import time
 Class that stores position of a voter, whether they are an agenda setter or
 veto player or not.
 '''
-
 
 class Voter(object):
 	def __init__(self, position, agenda_setter, veto_player):
@@ -58,24 +60,30 @@ For each variable, a value should be entered as per the input specifications.
 
 # number of runs of the simulation
 # input: any integer > 0
-runs 				= 1000
+runs 				= 10
 
-# the method used to calculate distance between to points
+# the method used to calculate distance between two points
 # input: 'pyth' (Pythagorean) or 'city-block' (city-block distance)
 distance_type 		= 'pyth'
 
 # the number of dimensions that the game uses
 # input: 1, 2, 3 TODO: extend to more dimensions
-number_dimensions 	= 1
+number_dimensions 	= 2
 
 # setting up the voters
 # input layout: Voter ( (POSITION), AS, VP )
 # NOTE: in 1 dimension, input voter values like so: (1,0,)
-voter_A 			= Voter((1.0,), False, True)
-voter_B				= Voter((4.0,), True, False)
-voter_C 			= Voter((3.0,), False, False)
-voter_D 			= Voter((2.0,), False, False)
-voter_E 			= Voter((2.5,), False, False)
+# NOTE: for ellipses, POSITION takes the following format:
+# ( X of Center, Y of Center, Width of Ellips, Height of Ellips, Angle of Ellips )
+voter_A 			= Voter((1.0, 2.0, 3.0, 1.2, 25.), False, True)
+voter_B				= Voter((4.0, 3.2, 2.5, 0.8, 5.), True, False)
+voter_C 			= Voter((3.0, 2.0, 1.0, 1.0, 15.), False, False)
+voter_D 			= Voter((2.0,4.2,2.3,.7,10.), False, False)
+voter_E 			= Voter((2.5,2.4,3.2,.9,8.), False, False)
+
+# shape of preferences
+# input: 'ellipse' or 'circle'
+preference_shape = 'ellipse'
 
 # vector with the voters
 # input: the names of all voters
@@ -84,24 +92,24 @@ voters 				= [voter_A, voter_B, voter_C, voter_D, voter_E]
 # determine the initial status quo
 # input: point with floats
 # NOTE: in 1 dimension, input status quo like so: (1,0,)
-status_quo 			= (5.0,4.5)
+status_quo 			= (5.0,3.5)
 
 # determine whether status quo changes for each iteration
 # input: 'no', 'random', 'history', 'history and drift'
 alter_status_quo	= 'history and drift'
 
 # set the drift in each dimension for the status quo
-# input: a list with the drift in each(!) dimension (can be zero)
+# input: a list with the drift in each(!) dimension (can be 0)
 # only required when alter_status_quo = 'history and drift'
-drift_status_quo	= [0.2,0.5,0.2]
+drift_status_quo	= [0.2,.1]
 
 # determine whether preferences for voters change for each iteration
 # input: 'no', 'drift'
-alter_preferences	= 'drift'
+alter_preferences	= 'no'
 
 # set the drift in each dimension for the voter
 # input: a list with the drift in each(!) dimension (can be zero), applied to every voter
-drift_players		= [0.2,0.5,0.1]
+drift_players		= [0.2,.1]
 
 # determine what type of distribution is used for random draws
 # input: 'normal', 'uniform', 'exponential', 'paretian'
@@ -123,12 +131,22 @@ breaks 				= 0.1
 # input: True, False
 save_results 		= True
 
+# boolean that determines if a visualization is created of the run. Only for two-dimensional simulations!
+# input: True, False
+visualize 			= True
+
+# determine how long a single run should be displayed if a visualization is created, in seconds
+# input: positive number (float or integer)
+
 # folder for saving results
 # input: 'FOLDERNAME' (only mandatory when save_results is True)
 folder				= 'RESULTS'
 
 
 #----------------------------------------------------------------------------------------------------#
+########################### USERS: DO NOT EDIT THE SCRIPT BELOW THIS LINE ###########################
+#----------------------------------------------------------------------------------------------------#
+
 
 def simulation():
 
@@ -199,7 +217,7 @@ def simulation():
 			possible_outcomes.append(possible_outcome)
 
 		# select the point preferred by the agenda setter out of all
-		# possible coalitions, and append to results
+		# possible outcomes, and append to results
 		outcome = closestToAgendaSetter(possible_outcomes)
 		current_results.append(outcome)
 
@@ -237,6 +255,15 @@ def simulation():
 		# results added to overall results
 		final_results.append(current_results)
 
+		# visualize results
+		if visualize == True:
+			# create folder and save directory
+			if run+1 == 1:
+				visualization_dir = visualizationFolder()
+
+			# visualize results and save in folder just created
+			visualizeResults(current_results, run+1, visualization_dir)
+
 		# set the new status quo
 		alterStatusQuo(outcome)
 
@@ -246,6 +273,10 @@ def simulation():
 	# save results to a csv file
 	if save_results == True:
 		saveResults(final_results)
+
+	# create video of simulation
+	if visualize == True:
+		animateResults(frame_duration)
 
 	return final_results
 
@@ -281,6 +312,7 @@ def addRandomPoints(size, breaks):
 	return points
 
 
+
 def pointsInWinset(random_points, voter_selection):
 
 	'''
@@ -295,44 +327,70 @@ def pointsInWinset(random_points, voter_selection):
 	# points will be stored in this array
 	selected_points = []
 
-	# determining the radius of agenda setter: how far away can points be to still be inside circle?
-	as_radius = determineDistance(agenda_setter.position, status_quo)
+	if preference_shape == 'circle':
 
-	# determining the radius for all relevant players
-	voter_radius = []
-	for voter in voter_selection:
-		radius = determineDistance(voter.position, status_quo)
-		voter_radius.append(radius)
+		# determining the radius of agenda setter: how far away can points be to still be inside circle?
+		as_radius = determineDistance(agenda_setter.position, status_quo)
 
-	# to determine if points are inside a circle:
-	# https://stackoverflow.com/questions/481144/equation-for-testing-if-a-point-is-inside-a-circle
+		# determining the radius for all relevant players
+		voter_radius = []
+		for voter in voter_selection:
+			radius = determineDistance(voter.position, status_quo)
+			voter_radius.append(radius)
 
-	for point in random_points:
+		# to determine if points are inside a circle:
+		# https://stackoverflow.com/questions/481144/equation-for-testing-if-a-point-is-inside-a-circle
 
-		# determine the distance of point to agenda setter
-		distance_point_as = determineDistance(agenda_setter.position, point)
+		for point in random_points:
 
-		# check if point is inside preference circle of agenda setter
-		if distance_point_as < as_radius:
+			# determine the distance of point to agenda setter
+			distance_point_as = determineDistance(agenda_setter.position, point)
 
-			# so far, the point has not been vetoed: the AS may propose it
-			point_vetoed = False
+			# check if point is inside preference circle of agenda setter
+			if distance_point_as < as_radius:
 
-			# check with each voter if point is OK
-			for i, player in enumerate(voter_selection):
+				# so far, the point has not been vetoed: the AS may propose it
+				point_vetoed = False
 
-				# determine the distance of point to every voter
-				distance_point_voter = determineDistance(voter_selection[i].position, point)
+				# check with each voter if point is OK
+				for i, player in enumerate(voter_selection):
 
-				# check if point is outside preference circle: it will be vetoed
-				if distance_point_voter > voter_radius[i]:
-					point_vetoed = True
+					# determine the distance of point to every voter
+					distance_point_voter = determineDistance(voter_selection[i].position, point)
 
-			# if a point was not vetoed by anyone, it can be appended
-			if point_vetoed == False:
-				selected_points.append(point)
+					# check if point is outside preference circle: it will be vetoed
+					if distance_point_voter > voter_radius[i]:
+						point_vetoed = True
+
+				# if a point was not vetoed by anyone, it can be appended
+				if point_vetoed == False:
+					selected_points.append(point)
+
+
+	elif preference_shape == 'ellips':
+
+		# check if point is inside all ellipses of this particular coalition
+		for point in random_points:
+
+			if insideEllipse(agenda_setter.position, point) == True:
+
+				# so far, the point has not been vetoed: the AS may propose it
+				point_vetoed = False
+
+				for i, player in enumerate(voter_selection):
+
+					# check if point is outside preference ellips: it will be vetoed
+					if insideEllipse(voter_selection[i].position, point) == False:
+						point_vetoed = True
+
+				# if a point was not vetoed by anyone, it can be appended
+				if point_vetoed == False:
+					selected_points.append(point)
+
 
 	return selected_points
+
+
 
 def determineCoalitions():
 
@@ -380,6 +438,7 @@ def determineCoalitions():
 	return possible_coalitions
 
 
+
 def closestToAgendaSetter(points_in_selection):
 
 	'''
@@ -423,6 +482,8 @@ def determineDistance(point1, point2, set_type=distance_type):
 	As such, it can also be used to determine the radius of a preference circle (by inputting
 	a point	and the status quo).
 	'''
+	if preference_shape == 'ellipse':
+		point2 = (point2[0], point2[1])
 
 	if set_type == 'pyth':
 		# determines distance between two points using Pythagorean theorem
@@ -433,6 +494,41 @@ def determineDistance(point1, point2, set_type=distance_type):
 		distance = dist.cityblock(point1, point2)
 
 	return distance
+
+
+
+def insideEllipse(ellipse, point):
+
+	'''
+	This function calculates if a single two-dimensional point is inside an
+	ellipse. It returns a boolean, confirming if a point is inside the ellipse or not.
+	'''
+
+	ellipse_center = tuple(ellipse[0], ellipse[1])
+	ellipse_width = ellipse[2]
+	ellipse_height = ellipse[3]
+	ellipse_angle = ellipse[4]
+
+
+	# from https://stackoverflow.com/questions/37031356/check-if-points-are-inside-ellipse-faster-than-contains-point-method
+	cos_angle = np.cos(np.radians(180.-ellipse_angle))
+	sin_angle = np.sin(np.radians(180.-ellipse_angle))
+
+	xc = point[0] - ellipse_center[0]
+	yc = point[1] - ellipse_center[1]
+
+	xct = xc * cos_angle - yc * sin_angle
+	yct = xc * sin_angle + yc * cos_angle
+
+	rad_cc = (xct**2/(ellipse_width/2.)**2) + (yct**2/(ellipse_height/2.)**2)
+
+	if rad_cc < 1.0:
+		# point is inside ellipse
+		return True
+
+	else:
+		# point is not inside ellipse
+		return False
 
 
 
@@ -495,6 +591,7 @@ def alterStatusQuo(outcome):
 	status_quo = tuple(new_status_quo)
 
 
+
 def alterPlayerPreferences():
 
 	'''
@@ -520,6 +617,11 @@ def alterPlayerPreferences():
 			for j in range(number_dimensions):
 				dim = voter[j] + vibration
 				new_voter.append(dim)
+			# if the shape is an ellipse, the other parameters need to be saved
+			if preference_shape == 'ellipse':
+				new_voter.append(voter[2])
+				new_voter.append(voter[3])
+				new_voter.append(voter[4])
 			voters[i].position = tuple(new_voter)
 
 	elif alter_preferences == 'drift':
@@ -532,10 +634,17 @@ def alterPlayerPreferences():
 			for j in range(number_dimensions):
 				dim = voter[j] + vibration + drift_players[j]
 				new_voter.append(dim)
+
+			# if the shape is an ellipse, the other parameters need to be saved
+			if preference_shape == 'ellipse':
+				new_voter.append(voter[2])
+				new_voter.append(voter[3])
+				new_voter.append(voter[4])
 			voters[i].position = tuple(new_voter)
 
 	else:
 		print 'alter_preferences was not defined correctly.'
+
 
 
 def saveResults(results):
@@ -572,6 +681,114 @@ def saveResults(results):
 		writer.writerow(result)
 
 	print 'Done! Find your results in', filename
+
+
+
+def visualizationFolder():
+
+	# creating datestamp for file
+	timestr = time.strftime("%Y-%m-%d_%H%M")
+
+	foldername = ''.join(('results', '-', str(model_number), '-', str(number_dimensions),
+		'-', str(len(veto_players)), '__', timestr))
+
+	# folder name
+	visualization_dir = os.path.join(os.path.split(os.path.realpath(__file__))[0], folder, foldername)
+	create_dir(visualization_dir)
+
+	return visualization_dir
+
+
+def visualizeResults(current_results, run, visualization_dir):
+
+	'''
+	This function visualizes the results of a single run, and saves it as png output in a folder.
+	'''
+
+	# creating an empty plot
+	fig = plt.figure(0)
+	ax = fig.add_subplot(111, aspect='equal')
+
+	# for storing values
+	voter_x_positions = []
+	voter_y_positions = []
+	veto_x_positions = []
+	veto_y_positions = []
+	preference_shapes = []
+
+	# for all 5 possible players, save the parameters of the circle or ellipse
+	for i in range(0,5):
+		try:
+			if preference_shape == 'ellipse':
+				g_ell_center = (current_results[i][0], current_results[i][1])
+				g_ell_width = current_results[i][2]
+				g_ell_height = current_results[i][3]
+				angle = current_results[i][4]
+				g_ellipse = patches.Ellipse(g_ell_center, g_ell_width, g_ell_height, angle, fill=False, edgecolor='black', linewidth=2)
+				preference_shapes.append(g_ellipse)
+
+			elif preference_shape == 'circle':
+				circle_center = (current_results[i][0], current_results[i][1])
+				circle_radius = determineDistance(circle_center, status_quo)
+				circle = plt.Circle(circle_center, circle_radius, fill=False, edgecolor = 'black', linewidth = 2)
+				preference_shapes.append(circle)
+
+			voter_x_positions.append(current_results[i][0])
+			voter_y_positions.append(current_results[i][1])
+
+		except:
+			print 'Error in visualization.'
+
+	# for all veto players, save the parameters of the ellipse
+	for voter in voters:
+		if voter.veto_player == True:
+			veto_x_positions.append(voter.position[0])
+			veto_y_positions.append(voter.position[1])
+
+	# add all circles/ellipses to the plot
+	for s in preference_shapes:
+		ax.add_artist(s)
+    	s.set_clip_box(ax.bbox)
+
+	# plotting the voters
+	plt.scatter(voter_x_positions, voter_y_positions, s=10, c='black')
+
+	# plotting the agenda setter
+	for voter in voters:
+		if voter.agenda_setter == True:
+			plt.scatter(voter.position[0], voter.position[1], s=30, c='lightblue')
+
+	# plotting veto players
+	plt.scatter(veto_x_positions, veto_y_positions, s=25, c='red')
+
+	# plotting the status quo
+	plt.scatter(current_results[8][0], current_results[8][1], s=25, c='orange')
+
+	# plotting the outcome
+	plt.scatter(current_results[9][0], current_results[9][1], s=40, c='yellow')
+
+	# set the size of the plot
+	ax.set_xlim(0, grid_size)
+	ax.set_ylim(0, grid_size)
+
+	# setting up filename and saving the plot, and clearing plot for next run
+	filename = ''.join((visualization_dir, '/', str(run), '.png'))
+	plt.savefig(filename)
+	plt.clf()
+
+
+def animateResults(frame_duration):
+	'''
+	This function creates an animation of the results of the complete simulation.
+	It only works when ffmpeg is installed.	I am not sure how well this function
+	works on different kinds of operating systems (created for Windows 10).
+	'''
+	try:
+		os.system("cd" + visualization_dir)
+		os.system("ffmpeg -r " +str(frame_duration)+ " -b 1800 -i *.png movie.mp4")
+
+	except:
+		print 'Animation could not be created. Please refer to the handbook.'
 
 
 
@@ -702,4 +919,7 @@ def oldDetermineMajority():
 #----------------------------------------------------------------------------------------------------#
 
 # running the simulation
-results = simulation()
+if error.errorcheck(number_dimensions, voters, status_quo, alter_status_quo, drift_status_quo, drift_players, preference_shape, visualize) == False:
+	print 'You did not pass the errorcheck. Program failed.'
+else:
+	results = simulation()
